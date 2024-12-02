@@ -1,4 +1,5 @@
-__pycache__/templeRunHandler.cpython-37.pyc
-__pycache__/frameCapture.cpython-37.pyc
+__pycache__
 output.avi
 output_video.avi
+dqn_model.h5
+dqn_model.keras
