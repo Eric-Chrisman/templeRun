@@ -1,44 +1,130 @@
-from  templeRunHandler import *
+import threading
+from deepQLearner import *
+from templeRunHandler import *
 from frameCapture import *
 import time
-
-
-startMacro()
+import random
+import numpy as np
+from collections import deque
+import cv2
 
 # Define the monitor region (customize this for your game window)
 monitor = {"top": 50, "left": 0, "width": 500, "height": 900}
 
-# Set up video writer to save the video
-fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 'XVID' codec for .avi format, 'mp4v' for .mp4
-out = cv2.VideoWriter('output_video.avi', fourcc, 20.0, (800, 600))  # Adjust frame rate and resolution
+# Define actions
+actions = ['jump', 'slide', 'go_left', 'go_right', 'lean_left', 'lean_center', 'lean_right']
+action_size = len(actions)
+input_shape = (224, 224, 3)
 
-time = 0
-timeEnd = 100
-# Capture and write frames to video
-try:
+# Initialize model, memory, and locks
+dqn = DQN(input_shape, action_size)
+memory = deque(maxlen=MEMORY_SIZE)
+memory_lock = threading.Lock()
+model_file_path = 'dqn_model.keras'  # Change to Keras format
+dqn.load_model(model_file_path)
+
+# Video writer for saving gameplay footage
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+out = cv2.VideoWriter('output_video.avi', fourcc, 20.0, (800, 600))
+
+# Flag for dead state
+is_dead = False
+dead_lock = threading.Lock()
+
+# New parameter to limit the number of deaths
+max_deaths = 10
+current_deaths = 0
+
+# Training thread
+def train_network():
     while True:
-        # Capture the screen
+        if len(memory) >= BATCH_SIZE:
+            with memory_lock:
+                batch = random.sample(memory, BATCH_SIZE)
+
+            for state, action_idx, reward, next_state, done in batch:
+                target = reward
+                if not done:
+                    target += GAMMA * np.max(dqn.predict(next_state)[0])
+                target_f = dqn.predict(state)
+                target_f[0][action_idx] = target
+                dqn.train(state, target_f)
+
+        time.sleep(0.01)  # Small delay to avoid overloading CPU
+
+# Check dead state in its own thread
+def check_if_dead():
+    global is_dead
+    while True:
+        with dead_lock:
+            is_dead = tryReset()  # Update is_dead based on the dead check
+        time.sleep(0.1)  # Adjust the frequency of checks as needed
+
+# Main gameplay loop
+try:
+    # Start threads for training and dead checking
+    training_thread = threading.Thread(target=train_network, daemon=True)
+    training_thread.start()
+
+    dead_check_thread = threading.Thread(target=check_if_dead, daemon=True)
+    dead_check_thread.start()
+
+    startMacro()
+    while True:
         frame = capture_screen(monitor)
-        
-        # Write the captured frame to the video
+        state = preprocess_image(frame)
+
+        # Optional: Display the gameplay footage
+        cv2.imshow("Recording", frame)
         out.write(frame)
         
-        # Optional: Display the frame while capturing (to see it in real time)
-        cv2.imshow("Recording", frame)
-        
+        # Prepare the state for prediction
+        state = prepare_input(state)
+
         # Exit the loop if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-        
 
-        # NEURAL NETWORK CODE HERE ALONG WITH WHAT BUTTON TO PRESS
-        if time > timeEnd:
-            tryReset() # if this returns true, YOU ARE DEAD! (in game), otherwise, you are alive
-            time = 0
+        # Action selection using epsilon-greedy strategy
+        if random.random() <= EPSILON:
+            action_idx = random.randrange(action_size)  # Explore
         else:
-            time += 1
+            q_values = dqn.predict(state)
+            action_idx = np.argmax(q_values[0])  # Exploit
+
+        action = actions[action_idx]
+        perform_action(action)
+
+        # Reward calculation
+        with dead_lock:
+            reward = 1 if not is_dead else -1000  # Reward for staying alive or penalize heavily for dying
+
+        # Store experience in memory
+        if not is_dead:
+            next_frame = capture_screen(monitor)
+            next_state = preprocess_image(next_frame)
+            next_state = prepare_input(next_state)
+
+            with memory_lock:
+                memory.append((state, action_idx, reward, next_state, is_dead))
+
+        # Reset game if dead
+        if is_dead:
+            current_deaths += 1  # Increment the death counter
+            resetMacro()
+            startMacro()
+
+        # Exit the program if max deaths have been reached
+        if current_deaths >= max_deaths:
+            print(f"Max deaths reached: {current_deaths}. Exiting program.")
+            break
+
+        # Adjust epsilon after each action
+        if EPSILON > EPSILON_MIN:
+            EPSILON *= EPSILON_DECAY
+
 finally:
-    # Release the video writer and close OpenCV windows
+    # Save the model before exiting
+    dqn.save_model(model_file_path)  # Use the Keras format
     out.release()
     cv2.destroyAllWindows()
-    

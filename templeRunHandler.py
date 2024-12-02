@@ -3,7 +3,6 @@ import pyautogui
 import time
 import keyboard
 import numpy as np
-import random
 import win32api, win32con
 
 # controls for a bot to play temple run with
@@ -78,7 +77,7 @@ def tryReset() -> bool:
     try:
         pyautogui.locateOnScreen("youDied.png", grayscale=True, confidence=0.8)
         print("dead")
-        resetMacro()
+        return True
     except pyautogui.ImageNotFoundException:
         print("not dead")
     return False
@@ -86,7 +85,7 @@ def tryReset() -> bool:
 # assumes that you are on score screen
 def resetMacro():
     click(150, 550)
-    sleep(1)
+    sleep(2)
     click(260,800)
 
 # assumes that you are on main menu. should olny be call at very very start of program
@@ -97,3 +96,20 @@ def startMacro():
 # don't call; displays mouse data forever. olny for mapping screen
 def displayMousePosition():
     pyautogui.displayMousePosition()
+
+def perform_action(action):
+    if action == 'jump':
+        swipeUp()
+    elif action == 'slide':
+        swipeDown()
+    elif action == 'go_left':
+        swipeLeft()
+    elif action == 'go_right':
+        swipeRight()
+    elif action == 'lean_left':
+        leanLeft()
+    elif action == 'lean_center':
+        leanLeft(False)
+        leanRight(False)
+    elif action == 'lean_right':
+        leanRight()
