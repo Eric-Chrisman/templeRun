@@ -2,11 +2,11 @@ import tensorflow as tf
 import os
 
 # Hyperparameters
-ALPHA = 0.001   # Learning rate
-GAMMA = 0.99    # Discount factor
-EPSILON = 1.0   # Exploration rate
-EPSILON_DECAY = 0.995
-EPSILON_MIN = 0.1
+ALPHA = 0.01   # Learning rate
+GAMMA = 0.5    # Discount factor
+EPSILON = 0.8  # Exploration rate
+EPSILON_DECAY = 0.95
+EPSILON_MIN = 0.3
 BATCH_SIZE = 32
 MEMORY_SIZE = 10000
 

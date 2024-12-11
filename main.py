@@ -32,13 +32,18 @@ is_dead = False
 dead_lock = threading.Lock()
 
 # New parameter to limit the number of deaths
-max_deaths = 10
+max_deaths = 1000
 current_deaths = 0
+new_experience_counter = 0
+
+TRAIN_AFTER_NEW_EXPERIENCES = 50  # Adjust this value based on your requirements
 
 # Training thread
 def train_network():
+    global new_experience_counter  # Counter to track new experiences
+
     while True:
-        if len(memory) >= BATCH_SIZE:
+        if len(memory) >= BATCH_SIZE and new_experience_counter >= TRAIN_AFTER_NEW_EXPERIENCES:
             with memory_lock:
                 batch = random.sample(memory, BATCH_SIZE)
 
@@ -49,6 +54,8 @@ def train_network():
                 target_f = dqn.predict(state)
                 target_f[0][action_idx] = target
                 dqn.train(state, target_f)
+
+            new_experience_counter = 0  # Reset the counter after training
 
         time.sleep(0.01)  # Small delay to avoid overloading CPU
 
@@ -105,8 +112,9 @@ try:
             next_state = preprocess_image(next_frame)
             next_state = prepare_input(next_state)
 
-            with memory_lock:
-                memory.append((state, action_idx, reward, next_state, is_dead))
+        with memory_lock:
+            memory.append((state, action_idx, reward, next_state, is_dead))
+            new_experience_counter += 1  # Increment the counter when adding new experiences
 
         # Reset game if dead
         if is_dead:
