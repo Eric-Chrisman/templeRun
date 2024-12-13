@@ -2,11 +2,11 @@ import tensorflow as tf
 import os
 
 # Hyperparameters
-ALPHA = 0.001   # Learning rate
-GAMMA = 0.99    # Discount factor
-EPSILON = 1.0   # Exploration rate
-EPSILON_DECAY = 0.995
-EPSILON_MIN = 0.1
+ALPHA = 0.3   # Learning rate
+GAMMA = 0.5    # Discount factor
+EPSILON = 0.9 # Exploration rate
+EPSILON_DECAY = 0.97
+EPSILON_MIN = 0.3
 BATCH_SIZE = 32
 MEMORY_SIZE = 10000
 
@@ -16,10 +16,15 @@ class DQN:
 
     def build_model(self, input_shape, action_size):
         model = tf.keras.Sequential([
-            tf.keras.layers.Flatten(input_shape=input_shape),
-            tf.keras.layers.Dense(24, activation='relu'),
-            tf.keras.layers.Dense(24, activation='relu'),
-            tf.keras.layers.Dense(action_size, activation='linear')
+            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(128, activation='relu'),
+            tf.keras.layers.Dense(64, activation='relu'),
+            tf.keras.layers.Dense(action_size, activation='linear')  # Output layer
         ])
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=ALPHA), loss='mse')
         return model
